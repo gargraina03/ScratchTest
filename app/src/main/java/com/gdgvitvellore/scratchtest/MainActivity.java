@@ -3,15 +3,21 @@ package com.gdgvitvellore.scratchtest;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
 import com.cooltechworks.views.ScratchTextView;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
-import static android.R.attr.name;
+import java.util.Objects;
+
+import static android.R.attr.enabled;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -20,10 +26,11 @@ public class MainActivity extends AppCompatActivity {
     private Button boolFlipper;
     private Boolean flipSwitch = false;
     private FirebaseDatabase database = FirebaseDatabase.getInstance();
-    private DatabaseReference mRef = database.getReference();
+    private DatabaseReference keyRef = database.getReference("keys");
+    private DatabaseReference enabledRef = database.getReference("scratchEnabled");
     public static final String MY_PREFS_NAME = "MyPrefsFile";
-    public static final String CouponKey = "couponKey";
-    public static final String checkGeneratedKey = "";
+    public static String CouponKey = "couponKey";;
+    public SharedPreferences sharedpreferences;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,16 +43,38 @@ public class MainActivity extends AppCompatActivity {
 
         scratchView.setVisibility(View.GONE);   //intiallly set to false
 
-        SharedPreferences sharedpreferences = getSharedPreferences(MY_PREFS_NAME, MODE_PRIVATE);
+        Log.v("enabledRefValue",enabledRef.toString());
+
+         sharedpreferences = getSharedPreferences(MY_PREFS_NAME, MODE_PRIVATE);
         if (sharedpreferences.contains(CouponKey)) {
             scratchView.setText(sharedpreferences.getString(CouponKey, ""));
         }
         else{
-            String key = scratchView.getText().toString();  //key to be taken from Firebase
+            String key = keyRef.push().getKey();//key to be taken from Firebase
+            key = key.substring(key.length()-8,key.length());
+            keyRef.child(key).setValue(key);
+            keyRef.addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+                    scratchView.setText(sharedpreferences.getString(CouponKey, ""));
+                    if (dataSnapshot.getValue())){
+                        placeholderTextView.setVisibility(View.GONE);
+                        scratchView.setVisibility(View.VISIBLE);
+                    }else{
+                        placeholderTextView.setVisibility(View.VISIBLE);
+                        scratchView.setVisibility(View.GONE);
+                    }
+                }
+
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+
+                }
+            });
+
             SharedPreferences.Editor editor = sharedpreferences.edit();
             editor.putString(CouponKey, key);
-            editor.putBoolean(checkGeneratedKey,true);
-            editor.commit();
+            editor.apply();
         }
 
         boolFlipper.setOnClickListener(new View.OnClickListener() {
